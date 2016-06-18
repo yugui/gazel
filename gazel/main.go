@@ -13,9 +13,13 @@ import (
 	"github.com/yugui/gazel/generator"
 )
 
-func generate(bctx build.Context, root string) error {
+var (
+	goPrefix = flag.String("go_prefix", "", "go_prefix of the target workspace")
+)
+
+func generate(bctx build.Context, goPrefix, root string) error {
 	var rules []bzl.Expr
-	g := generator.New()
+	g := generator.New(goPrefix)
 	err := generator.Walk(bctx, root, func(dir string, pkg *build.Package) error {
 		rs, err := g.Generate(dir, pkg)
 		if err != nil {
@@ -36,12 +40,12 @@ func generate(bctx build.Context, root string) error {
 	return err
 }
 
-func run(dirs []string) error {
+func run(goPrefix string, dirs []string) error {
 	bctx := build.Default
 	// Ignore $GOPATH environment variable
 	bctx.GOPATH = ""
 	for _, d := range dirs {
-		if err := generate(bctx, d); err != nil {
+		if err := generate(bctx, goPrefix, d); err != nil {
 			return err
 		}
 	}
@@ -61,7 +65,13 @@ You can still use Gazel for other purposes, but its interface can change without
 func main() {
 	flag.Usage = usage
 	flag.Parse()
-	if err := run(flag.Args()); err != nil {
+
+	if *goPrefix == "" {
+		// TODO(yugui) Extract go_prefix from the top level BUILD file if exists
+		log.Fatal("-go_prefix is required")
+	}
+
+	if err := run(*goPrefix, flag.Args()); err != nil {
 		log.Fatal(err)
 	}
 }

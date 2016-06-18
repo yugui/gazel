@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"example.com/gazel-testdata.git/lib"
+	"example.com/repo/lib"
 )
 
 func main() {

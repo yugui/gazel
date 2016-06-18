@@ -43,7 +43,7 @@ func packageFromDir(t *testing.T, dir string) *build.Package {
 }
 
 func TestGeneratorWithLib(t *testing.T) {
-	g := generator.New()
+	g := generator.New("example.com/repo")
 	pkg := packageFromDir(t, filepath.Join(testData(), "lib"))
 	rules, err := g.Generate(".", pkg)
 	if err != nil {
@@ -62,7 +62,7 @@ func TestGeneratorWithLib(t *testing.T) {
 }
 
 func TestGeneratorWithSubdirLib(t *testing.T) {
-	g := generator.New()
+	g := generator.New("example.com/repo")
 	pkg := packageFromDir(t, filepath.Join(testData(), "lib"))
 	rules, err := g.Generate("lib", pkg)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestGeneratorWithSubdirLib(t *testing.T) {
 }
 
 func TestGeneratorWithBin(t *testing.T) {
-	g := generator.New()
+	g := generator.New("example.com/repo")
 	pkg := packageFromDir(t, filepath.Join(testData(), "bin"))
 	rules, err := g.Generate("bin", pkg)
 	if err != nil {
@@ -92,6 +92,7 @@ func TestGeneratorWithBin(t *testing.T) {
 		go_binary(
 			name = "bin",
 			srcs = ["main.go"],
+			deps = ["//lib:go_default_library"],
 		)
 	`)
 	if got := format(rules); got != want {
