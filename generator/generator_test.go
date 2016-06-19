@@ -55,6 +55,12 @@ func TestGeneratorWithLib(t *testing.T) {
 			name = "go_default_library",
 			srcs = ["doc.go", "lib.go"],
 		)
+
+		go_test(
+			name = "go_default_test",
+			srcs = ["lib_test.go"],
+			library = ":go_default_library",
+		)
 	`)
 	if got := format(rules); got != want {
 		t.Errorf(`g.Generate(".", %#v) = %s; want %s`, pkg, got, want)
@@ -73,6 +79,12 @@ func TestGeneratorWithSubdirLib(t *testing.T) {
 		go_library(
 			name = "lib",
 			srcs = ["doc.go", "lib.go"],
+		)
+
+		go_test(
+			name = "lib_test",
+			srcs = ["lib_test.go"],
+			library = ":lib",
 		)
 	`)
 	if got := format(rules); got != want {

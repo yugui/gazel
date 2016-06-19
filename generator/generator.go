@@ -30,9 +30,27 @@ type generator struct {
 }
 
 func (g *generator) Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error) {
+	r, err := g.generate(dir, pkg.GoFiles, pkg.Imports, pkg.IsCommand())
+	if err != nil {
+		return nil, err
+	}
+	rules := []*bzl.Rule{r}
+
+	if len(pkg.TestGoFiles) > 0 {
+		t, err := g.generateTest(dir, pkg.TestGoFiles, pkg.TestImports, r.AttrString("name"))
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, t)
+	}
+
+	return rules, nil
+}
+
+func (g *generator) generate(dir string, srcs, imports []string, isCommand bool) (*bzl.Rule, error) {
 	kind := "go_library"
 	name := filepath.ToSlash(dir)
-	if pkg.IsCommand() {
+	if isCommand {
 		kind = "go_binary"
 		name = filepath.Base(dir)
 	}
@@ -42,10 +60,10 @@ func (g *generator) Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error
 
 	attrs := []keyvalue{
 		{key: "name", value: name},
-		{key: "srcs", value: pkg.GoFiles},
+		{key: "srcs", value: srcs},
 	}
 
-	deps, err := g.dependencies(pkg)
+	deps, err := g.dependencies(imports)
 	if err != nil {
 		return nil, err
 	}
@@ -53,19 +71,35 @@ func (g *generator) Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error
 		attrs = append(attrs, keyvalue{key: "deps", value: deps})
 	}
 
-	var rules []*bzl.Rule
-	r, err := newRule(kind, nil, attrs)
+	return newRule(kind, nil, attrs)
+}
+
+func (g *generator) generateTest(dir string, srcs, imports []string, library string) (*bzl.Rule, error) {
+	name := filepath.ToSlash(dir) + "_test"
+	if dir == "." {
+		name = "go_default_test"
+	}
+
+	attrs := []keyvalue{
+		{key: "name", value: name},
+		{key: "srcs", value: srcs},
+		{key: "library", value: ":" + library},
+	}
+
+	deps, err := g.dependencies(imports)
 	if err != nil {
 		return nil, err
 	}
-	rules = append(rules, r)
-	return rules, nil
+	if len(deps) > 0 {
+		attrs = append(attrs, keyvalue{key: "deps", value: deps})
+	}
+	return newRule("go_test", nil, attrs)
 }
 
-func (g *generator) dependencies(pkg *build.Package) ([]string, error) {
+func (g *generator) dependencies(imports []string) ([]string, error) {
 	var deps []string
-	for _, p := range pkg.Imports {
-		if g.isStandard(p) {
+	for _, p := range imports {
+		if isStandard(p) {
 			continue
 		}
 		l, err := g.r.resolve(p)
@@ -78,7 +112,7 @@ func (g *generator) dependencies(pkg *build.Package) ([]string, error) {
 }
 
 // isStandard determines if importpath points a Go standard package.
-func (g *generator) isStandard(importpath string) bool {
+func isStandard(importpath string) bool {
 	seg := strings.SplitN(importpath, "/", 2)[0]
 	return !strings.Contains(seg, ".")
 }
