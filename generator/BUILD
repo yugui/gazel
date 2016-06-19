@@ -7,7 +7,8 @@ go_library(
         "construct.go",
         "generator.go",
         "resolve.go",
-        "resolve_internal.go",
+        "resolve_flat.go",
+        "resolve_structured.go",
     ],
     deps = [
         "@io_bazel_buildifier//core:go_default_library",
@@ -31,7 +32,8 @@ go_test(
 go_test(
     name = "generator_test",
     srcs = [
-        "resolve_internal_test.go",
+        "resolve_flat_test.go",
+        "resolve_structured_test.go",
     ],
     library = ":go_default_library",
     data = glob(["testdata/**/*"]),

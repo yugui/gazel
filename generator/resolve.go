@@ -7,9 +7,13 @@ import (
 // A label represents a label of a build target in Bazel.
 type label struct {
 	repo, pkg, name string
+	relative        bool
 }
 
 func (l label) String() string {
+	if l.relative {
+		return fmt.Sprintf(":%s", l.name)
+	}
 	if l.repo != "" {
 		return fmt.Sprintf("@%s//%s:%s", l.repo, l.pkg, l.name)
 	}
@@ -18,7 +22,11 @@ func (l label) String() string {
 
 // A labelResolver resolves a Go importpath into a label in Bazel.
 type labelResolver interface {
-	resolve(importpath string) (label, error)
+	// resolve resolves a Go importpath "importpath", which is referenced from
+	// a Go package directory "dir" in the current repository.
+	// "dir" is a relative slash-delimited path from the top level of the
+	// current repository.
+	resolve(importpath, dir string) (label, error)
 }
 
 type resolverFunc func(importpath string) (label, error)

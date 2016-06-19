@@ -15,11 +15,12 @@ import (
 
 var (
 	goPrefix = flag.String("go_prefix", "", "go_prefix of the target workspace")
+	flat     = flag.Bool("flat", false, "creates a large single BUILD file in the top of repository instead of creating a BUILD file for each Go package")
 )
 
-func generate(bctx build.Context, goPrefix, root string) error {
+func generate(bctx build.Context, mode generator.Mode, root string) error {
 	var rules []bzl.Expr
-	g := generator.New(goPrefix)
+	g := generator.New(*goPrefix, mode)
 	err := generator.Walk(bctx, root, func(dir string, pkg *build.Package) error {
 		rs, err := g.Generate(dir, pkg)
 		if err != nil {
@@ -40,12 +41,18 @@ func generate(bctx build.Context, goPrefix, root string) error {
 	return err
 }
 
-func run(goPrefix string, dirs []string) error {
+func run(dirs []string) error {
 	bctx := build.Default
 	// Ignore $GOPATH environment variable
 	bctx.GOPATH = ""
+
+	m := generator.StructuredMode
+	if *flat {
+		m = generator.FlatMode
+	}
+
 	for _, d := range dirs {
-		if err := generate(bctx, goPrefix, d); err != nil {
+		if err := generate(bctx, m, d); err != nil {
 			return err
 		}
 	}
@@ -70,8 +77,11 @@ func main() {
 		// TODO(yugui) Extract go_prefix from the top level BUILD file if exists
 		log.Fatal("-go_prefix is required")
 	}
+	if len(flag.Args()) > 1 && *flat {
+		log.Fatal("can have only one argument when -flat=true")
+	}
 
-	if err := run(*goPrefix, flag.Args()); err != nil {
+	if err := run(flag.Args()); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -7,8 +7,8 @@ import (
 )
 
 // A WalkFunc is a callback called by Walk for each package.
-// The first parameter "dir" is a relative path to the package directory from the given root.
-// "dir" is "." for the root itself.
+// The first parameter "dir" is a relative shash-delimited path to the Go package
+// directory from the given root.  "dir" is empty for the root itself.
 // The secnd parameter "pkg" is package metadata.
 type WalkFunc func(dir string, pkg *build.Package) error
 
@@ -23,16 +23,21 @@ func Walk(bctx build.Context, root string, f WalkFunc) error {
 			return nil
 		}
 
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
 		pkg, err := bctx.ImportDir(path, build.ImportComment)
 		if _, ok := err.(*build.NoGoError); ok {
 			return nil
 		}
 		if err != nil {
 			return err
+		}
+
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "." {
+			rel = ""
 		}
 		return f(rel, pkg)
 	})

@@ -1,7 +1,9 @@
 package generator
 
 import (
+	"fmt"
 	"go/build"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -11,26 +13,48 @@ import (
 // Generator generates Bazel build rules for a Go package.
 type Generator interface {
 	// Generate generates build rules for a Go package.
-	// "dir" is a relative path from the current Bazel package directory to the Go package.
-	// "pkg" is a description about the package.
+	// "dir" is a relative path from the current Bazel package directory to the
+	// Go package. "pkg" is a description about the package.
 	Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error)
 }
 
+// A Mode describes how Generator organizes rules for different Go packages.
+type Mode int
+
+const (
+	// FlatMode means that Generator puts all rules for different Go packages
+	// in the current repository into a single top level package of Bazel.
+	FlatMode = Mode(iota) + 1
+	// StructuredMode means that Generator generates a Bazel package for each
+	// Go package.
+	StructuredMode
+)
+
 // New returns an implementation of Generator.
-func New(goPrefix string) Generator {
-	return &generator{
-		r: internalResolver{
+func New(goPrefix string, mode Mode) Generator {
+	switch mode {
+	case FlatMode:
+		return &generator{
 			goPrefix: goPrefix,
-		},
+			r:        flatResolver{goPrefix: goPrefix},
+		}
+	case StructuredMode:
+		return &generator{
+			goPrefix: goPrefix,
+			r:        structuredResolver{goPrefix: goPrefix},
+		}
+	default:
+		panic(fmt.Sprintf("unrecognized mode %d", mode))
 	}
 }
 
 type generator struct {
-	r labelResolver
+	goPrefix string
+	r        labelResolver
 }
 
 func (g *generator) Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error) {
-	r, err := g.generate(dir, pkg.GoFiles, pkg.Imports, pkg.IsCommand())
+	r, err := g.generate(filepath.Base(pkg.Dir), dir, pkg.GoFiles, pkg.Imports, pkg.IsCommand())
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +69,7 @@ func (g *generator) Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error
 	}
 
 	if len(pkg.XTestGoFiles) > 0 {
-		t, err := g.generateXTest(dir, pkg.XTestGoFiles, pkg.XTestImports, r.AttrString("name"))
+		t, err := g.generateXTest(dir, pkg.XTestGoFiles, pkg.XTestImports)
 		if err != nil {
 			return nil, err
 		}
@@ -55,15 +79,17 @@ func (g *generator) Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error
 	return rules, nil
 }
 
-func (g *generator) generate(dir string, srcs, imports []string, isCommand bool) (*bzl.Rule, error) {
+func (g *generator) generate(basename, rel string, srcs, imports []string, isCommand bool) (*bzl.Rule, error) {
+	l, err := g.r.resolve(path.Join(g.goPrefix, rel), rel)
+	if err != nil {
+		return nil, err
+	}
+	name := l.name
+
 	kind := "go_library"
-	name := filepath.ToSlash(dir)
 	if isCommand {
 		kind = "go_binary"
-		name = filepath.Base(dir)
-	}
-	if dir == "." {
-		name = "go_default_library"
+		name = basename
 	}
 
 	attrs := []keyvalue{
@@ -71,7 +97,7 @@ func (g *generator) generate(dir string, srcs, imports []string, isCommand bool)
 		{key: "srcs", value: srcs},
 	}
 
-	deps, err := g.dependencies(imports)
+	deps, err := g.dependencies(imports, rel)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +109,12 @@ func (g *generator) generate(dir string, srcs, imports []string, isCommand bool)
 }
 
 func (g *generator) generateTest(dir string, srcs, imports []string, library string) (*bzl.Rule, error) {
-	name := filepath.ToSlash(dir) + "_test"
-	if dir == "." {
+	l, err := g.r.resolve(path.Join(g.goPrefix, dir), dir)
+	if err != nil {
+		return nil, err
+	}
+	name := l.name + "_test"
+	if l.name == "go_default_library" {
 		name = "go_default_test"
 	}
 
@@ -94,7 +124,7 @@ func (g *generator) generateTest(dir string, srcs, imports []string, library str
 		{key: "library", value: ":" + library},
 	}
 
-	deps, err := g.dependencies(imports)
+	deps, err := g.dependencies(imports, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -104,9 +134,13 @@ func (g *generator) generateTest(dir string, srcs, imports []string, library str
 	return newRule("go_test", nil, attrs)
 }
 
-func (g *generator) generateXTest(dir string, srcs, imports []string, library string) (*bzl.Rule, error) {
-	name := filepath.ToSlash(dir) + "_xtest"
-	if dir == "." {
+func (g *generator) generateXTest(dir string, srcs, imports []string) (*bzl.Rule, error) {
+	l, err := g.r.resolve(path.Join(g.goPrefix, dir), dir)
+	if err != nil {
+		return nil, err
+	}
+	name := l.name + "_xtest"
+	if l.name == "go_default_library" {
 		name = "go_default_xtest"
 	}
 
@@ -115,22 +149,21 @@ func (g *generator) generateXTest(dir string, srcs, imports []string, library st
 		{key: "srcs", value: srcs},
 	}
 
-	deps, err := g.dependencies(imports)
+	deps, err := g.dependencies(imports, dir)
 	if err != nil {
 		return nil, err
 	}
-	deps = append(deps, ":"+library)
 	attrs = append(attrs, keyvalue{key: "deps", value: deps})
 	return newRule("go_test", nil, attrs)
 }
 
-func (g *generator) dependencies(imports []string) ([]string, error) {
+func (g *generator) dependencies(imports []string, dir string) ([]string, error) {
 	var deps []string
 	for _, p := range imports {
 		if isStandard(p) {
 			continue
 		}
-		l, err := g.r.resolve(p)
+		l, err := g.r.resolve(p, dir)
 		if err != nil {
 			return nil, err
 		}

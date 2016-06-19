@@ -12,12 +12,12 @@ Prototype
 * Collects `srcs`
 * Collects `deps` within the same repository
 * Generate `go_test`
+* flat-mode, which generates a single large BUILD for a Go package tree
 
 ## TODO
 * Collect `deps` from external dependency
 * Collect `deps` from vendor directory
 * Build tags, release tags
-* Support generating a `BUILD` file for each Go package
 * cgo
 * SWIG
   * once [`rules_go`](https://github.com/bazelbuild/rules_go) supports SWIG.

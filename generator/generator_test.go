@@ -42,18 +42,19 @@ func packageFromDir(t *testing.T, dir string) *build.Package {
 	return pkg
 }
 
-func TestGeneratorWithLib(t *testing.T) {
-	g := generator.New("example.com/repo")
+func TestGeneratorWithLibStructured(t *testing.T) {
+	g := generator.New("example.com/repo", generator.StructuredMode)
 	pkg := packageFromDir(t, filepath.Join(testData(), "lib"))
-	rules, err := g.Generate(".", pkg)
+	rules, err := g.Generate("lib", pkg)
 	if err != nil {
-		t.Errorf(`g.Generate(".", %#v) failed with %v; want success`, pkg, err)
+		t.Errorf(`g.Generate("lib", %#v) failed with %v; want success`, pkg, err)
 	}
 
 	want := canonicalize(t, "BUILD", `
 		go_library(
 			name = "go_default_library",
 			srcs = ["doc.go", "lib.go"],
+			deps = ["//lib/deep:go_default_library"],
 		)
 
 		go_test(
@@ -73,8 +74,8 @@ func TestGeneratorWithLib(t *testing.T) {
 	}
 }
 
-func TestGeneratorWithSubdirLib(t *testing.T) {
-	g := generator.New("example.com/repo")
+func TestGeneratorWithLibFlat(t *testing.T) {
+	g := generator.New("example.com/repo", generator.FlatMode)
 	pkg := packageFromDir(t, filepath.Join(testData(), "lib"))
 	rules, err := g.Generate("lib", pkg)
 	if err != nil {
@@ -85,6 +86,7 @@ func TestGeneratorWithSubdirLib(t *testing.T) {
 		go_library(
 			name = "lib",
 			srcs = ["doc.go", "lib.go"],
+			deps = [":lib/deep"],
 		)
 
 		go_test(
@@ -95,17 +97,37 @@ func TestGeneratorWithSubdirLib(t *testing.T) {
 
 		go_test(
 			name = "lib_xtest",
-			srcs = ["lib_test.go"],
+			srcs = ["lib_external_test.go"],
 			deps = [":lib"],
 		)
 	`)
 	if got := format(rules); got != want {
-		t.Errorf(`g.Generate(".", %#v) = %s; want %s`, pkg, got, want)
+		t.Errorf(`g.Generate("lib", %#v) = %s; want %s`, pkg, got, want)
 	}
 }
 
-func TestGeneratorWithBin(t *testing.T) {
-	g := generator.New("example.com/repo")
+func TestGeneratorWithBinStructured(t *testing.T) {
+	g := generator.New("example.com/repo", generator.StructuredMode)
+	pkg := packageFromDir(t, filepath.Join(testData(), "bin"))
+	rules, err := g.Generate("bin", pkg)
+	if err != nil {
+		t.Errorf(`g.Generate("bin", %#v) failed with %v; want success`, pkg, err)
+	}
+
+	want := canonicalize(t, "BUILD", `
+		go_binary(
+			name = "bin",
+			srcs = ["main.go"],
+			deps = ["//lib:go_default_library"],
+		)
+	`)
+	if got := format(rules); got != want {
+		t.Errorf(`g.Generate("bin", %#v) = %s; want %s`, pkg, got, want)
+	}
+}
+
+func TestGeneratorWithBinFlat(t *testing.T) {
+	g := generator.New("example.com/repo", generator.FlatMode)
 	pkg := packageFromDir(t, filepath.Join(testData(), "bin"))
 	rules, err := g.Generate("bin", pkg)
 	if err != nil {
@@ -116,10 +138,10 @@ func TestGeneratorWithBin(t *testing.T) {
 		go_binary(
 			name = "bin",
 			srcs = ["main.go"],
-			deps = ["//lib:go_default_library"],
+			deps = [":lib"],
 		)
 	`)
 	if got := format(rules); got != want {
-		t.Errorf(`g.Generate(".", %#v) = %s; want %s`, pkg, got, want)
+		t.Errorf(`g.Generate("bin", %#v) = %s; want %s`, pkg, got, want)
 	}
 }
