@@ -8,6 +8,7 @@ import (
 	"go/build"
 	"log"
 	"os"
+	"path/filepath"
 
 	bzl "github.com/bazelbuild/buildifier/core"
 	"github.com/yugui/gazel/generator"
@@ -19,9 +20,22 @@ var (
 )
 
 func generate(bctx build.Context, mode generator.Mode, root string) error {
-	var rules []bzl.Expr
 	g := generator.New(*goPrefix, mode)
-	err := generator.Walk(bctx, root, func(dir string, pkg *build.Package) error {
+
+	drive := func(bctx build.Context, root string, f generator.WalkFunc) error {
+		pkg, err := bctx.ImportDir(root, build.ImportComment)
+		if err != nil {
+			return err
+		}
+		return f("", pkg)
+	}
+	if filepath.Base(root) == "..." {
+		drive = generator.Walk
+		root = filepath.Dir(root)
+	}
+
+	var rules []bzl.Expr
+	err := drive(bctx, root, func(dir string, pkg *build.Package) error {
 		rs, err := g.Generate(dir, pkg)
 		if err != nil {
 			return err
