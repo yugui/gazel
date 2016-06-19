@@ -11,9 +11,9 @@ Prototype
 * Generates `go_binary` for command packages
 * Collects `srcs`
 * Collects `deps` within the same repository
+* Generate `go_test`
 
 ## TODO
-* Generate `go_test`
 * Collect `deps` from external dependency
 * Collect `deps` from vendor directory
 * Build tags, release tags

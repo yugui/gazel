@@ -44,6 +44,14 @@ func (g *generator) Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error
 		rules = append(rules, t)
 	}
 
+	if len(pkg.XTestGoFiles) > 0 {
+		t, err := g.generateXTest(dir, pkg.XTestGoFiles, pkg.XTestImports, r.AttrString("name"))
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, t)
+	}
+
 	return rules, nil
 }
 
@@ -93,6 +101,26 @@ func (g *generator) generateTest(dir string, srcs, imports []string, library str
 	if len(deps) > 0 {
 		attrs = append(attrs, keyvalue{key: "deps", value: deps})
 	}
+	return newRule("go_test", nil, attrs)
+}
+
+func (g *generator) generateXTest(dir string, srcs, imports []string, library string) (*bzl.Rule, error) {
+	name := filepath.ToSlash(dir) + "_xtest"
+	if dir == "." {
+		name = "go_default_xtest"
+	}
+
+	attrs := []keyvalue{
+		{key: "name", value: name},
+		{key: "srcs", value: srcs},
+	}
+
+	deps, err := g.dependencies(imports)
+	if err != nil {
+		return nil, err
+	}
+	deps = append(deps, ":"+library)
+	attrs = append(attrs, keyvalue{key: "deps", value: deps})
 	return newRule("go_test", nil, attrs)
 }
 

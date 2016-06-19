@@ -61,6 +61,12 @@ func TestGeneratorWithLib(t *testing.T) {
 			srcs = ["lib_test.go"],
 			library = ":go_default_library",
 		)
+
+		go_test(
+			name = "go_default_xtest",
+			srcs = ["lib_external_test.go"],
+			deps = [":go_default_library"],
+		)
 	`)
 	if got := format(rules); got != want {
 		t.Errorf(`g.Generate(".", %#v) = %s; want %s`, pkg, got, want)
@@ -85,6 +91,12 @@ func TestGeneratorWithSubdirLib(t *testing.T) {
 			name = "lib_test",
 			srcs = ["lib_test.go"],
 			library = ":lib",
+		)
+
+		go_test(
+			name = "lib_xtest",
+			srcs = ["lib_test.go"],
+			deps = [":lib"],
 		)
 	`)
 	if got := format(rules); got != want {
