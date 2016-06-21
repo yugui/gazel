@@ -13,8 +13,9 @@ import (
 // Generator generates Bazel build rules for a Go package.
 type Generator interface {
 	// Generate generates build rules for a Go package.
-	// "dir" is a relative path from the current Bazel package directory to the
-	// Go package. "pkg" is a description about the package.
+	// "dir" is a relative path from the repository root to the directory of
+	// the Go package.
+	// "pkg" is a description about the package.
 	Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error)
 }
 
@@ -31,6 +32,8 @@ const (
 )
 
 // New returns an implementation of Generator.
+// "goPrefix" is the go_prefix corresponding to the repository root.
+// "mode" specifies how to organize rules for different Go packages.
 func New(goPrefix string, mode Mode) Generator {
 	switch mode {
 	case FlatMode:

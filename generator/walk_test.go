@@ -29,7 +29,7 @@ func TestWalkSimple(t *testing.T) {
 	}
 
 	var n int
-	err = generator.Walk(build.Default, dir, func(d string, pkg *build.Package) error {
+	err = generator.Walk(build.Default, dir, func(pkg *build.Package) error {
 		if got, want := pkg.Name, "lib"; got != want {
 			t.Errorf("pkg.Name = %q; want %q", got, want)
 		}
@@ -67,9 +67,14 @@ func TestWalkNested(t *testing.T) {
 		}
 	}
 
-	var pkgs, dirs []string
-	err = generator.Walk(build.Default, dir, func(d string, pkg *build.Package) error {
-		dirs = append(dirs, d)
+	var dirs, pkgs []string
+	err = generator.Walk(build.Default, dir, func(pkg *build.Package) error {
+		rel, err := filepath.Rel(dir, pkg.Dir)
+		if err != nil {
+			t.Errorf("filepath.Rel(%q, %q) failed with %v; want success", dir, pkg.Dir, err)
+			return err
+		}
+		dirs = append(dirs, rel)
 		pkgs = append(pkgs, pkg.Name)
 		return nil
 	})
@@ -79,7 +84,7 @@ func TestWalkNested(t *testing.T) {
 
 	sort.Strings(dirs)
 	if got, want := dirs, []string{"a", "b/c", "b/d"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("dirs = %q; want %q", got, want)
+		t.Errorf("pkgs = %q; want %q", got, want)
 	}
 	sort.Strings(pkgs)
 	if got, want := pkgs, []string{"a", "c", "main"}; !reflect.DeepEqual(got, want) {
