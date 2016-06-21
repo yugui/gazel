@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+	"path"
 	"strings"
 )
 
@@ -11,7 +12,11 @@ type flatResolver struct {
 	goPrefix string
 }
 
-func (r flatResolver) resolve(importpath, _ string) (label, error) {
+func (r flatResolver) resolve(importpath, dir string) (label, error) {
+	if strings.HasPrefix(importpath, "./") {
+		importpath = path.Join(r.goPrefix, dir, importpath[2:])
+	}
+
 	if importpath == r.goPrefix {
 		return label{name: "go_default_library", relative: true}, nil
 	}

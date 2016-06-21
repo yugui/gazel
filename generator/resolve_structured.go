@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+	"path"
 	"strings"
 )
 
@@ -14,6 +15,10 @@ type structuredResolver struct {
 // resolve takes a Go importpath within the same respository as r.goPrefix
 // and resolves it into a label in Bazel.
 func (r structuredResolver) resolve(importpath, dir string) (label, error) {
+	if strings.HasPrefix(importpath, "./") {
+		importpath = path.Join(r.goPrefix, dir, importpath[2:])
+	}
+
 	if importpath == r.goPrefix {
 		return label{name: "go_default_library"}, nil
 	}
