@@ -6,6 +6,7 @@ go_library(
         "construct.go",
         "generator.go",
         "resolve.go",
+        "resolve_external.go",
         "resolve_flat.go",
         "resolve_structured.go",
         "walk.go",

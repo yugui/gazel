@@ -29,8 +29,8 @@ type labelResolver interface {
 	resolve(importpath, dir string) (label, error)
 }
 
-type resolverFunc func(importpath string) (label, error)
+type resolverFunc func(importpath, dir string) (label, error)
 
-func (f resolverFunc) resolve(importpath string) (label, error) {
-	return f(importpath)
+func (f resolverFunc) resolve(importpath, dir string) (label, error) {
+	return f(importpath, dir)
 }

@@ -35,19 +35,26 @@ const (
 // "goPrefix" is the go_prefix corresponding to the repository root.
 // "mode" specifies how to organize rules for different Go packages.
 func New(goPrefix string, mode Mode) Generator {
+	var r0 labelResolver
 	switch mode {
 	case FlatMode:
-		return &generator{
-			goPrefix: goPrefix,
-			r:        flatResolver{goPrefix: goPrefix},
-		}
+		r0 = flatResolver{goPrefix: goPrefix}
 	case StructuredMode:
-		return &generator{
-			goPrefix: goPrefix,
-			r:        structuredResolver{goPrefix: goPrefix},
-		}
+		r0 = structuredResolver{goPrefix: goPrefix}
 	default:
 		panic(fmt.Sprintf("unrecognized mode %d", mode))
+	}
+
+	var e externalResolver
+	r := resolverFunc(func(importpath, dir string) (label, error) {
+		if importpath != goPrefix && !strings.HasPrefix(importpath, goPrefix+"/") && !strings.HasPrefix(importpath, "./") {
+			return e.resolve(importpath, dir)
+		}
+		return r0.resolve(importpath, dir)
+	})
+	return &generator{
+		goPrefix: goPrefix,
+		r:        r,
 	}
 }
 
