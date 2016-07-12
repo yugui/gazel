@@ -36,11 +36,21 @@ const (
 // "mode" specifies how to organize rules for different Go packages.
 func New(goPrefix string, mode Mode) Generator {
 	var r0 labelResolver
+	var refsrc func(rel string, srcs []string) []string
+
 	switch mode {
 	case FlatMode:
 		r0 = flatResolver{goPrefix: goPrefix}
+		refsrc = func(rel string, srcs []string) []string {
+			var ret []string
+			for _, s := range srcs {
+				ret = append(ret, path.Join(rel, s))
+			}
+			return ret
+		}
 	case StructuredMode:
 		r0 = structuredResolver{goPrefix: goPrefix}
+		refsrc = func(rel string, srcs []string) []string { return srcs }
 	default:
 		panic(fmt.Sprintf("unrecognized mode %d", mode))
 	}
@@ -55,12 +65,14 @@ func New(goPrefix string, mode Mode) Generator {
 	return &generator{
 		goPrefix: goPrefix,
 		r:        r,
+		refSrc:   refsrc,
 	}
 }
 
 type generator struct {
 	goPrefix string
 	r        labelResolver
+	refSrc   func(rel string, srcs []string) []string
 }
 
 func (g *generator) Generate(dir string, pkg *build.Package) ([]*bzl.Rule, error) {
@@ -104,7 +116,13 @@ func (g *generator) generate(basename, rel string, srcs, imports []string, isCom
 
 	attrs := []keyvalue{
 		{key: "name", value: name},
-		{key: "srcs", value: srcs},
+		{key: "srcs", value: g.refSrc(srcs)},
+	}
+	if !isCommand {
+		attrs = append(attrs, keyvalue{
+			key:   "visibility",
+			value: []string{"//visibility:public"},
+		})
 	}
 
 	deps, err := g.dependencies(imports, rel)
@@ -130,7 +148,7 @@ func (g *generator) generateTest(dir string, srcs, imports []string, library str
 
 	attrs := []keyvalue{
 		{key: "name", value: name},
-		{key: "srcs", value: srcs},
+		{key: "srcs", value: g.refSrc(srcs)},
 		{key: "library", value: ":" + library},
 	}
 
@@ -156,7 +174,7 @@ func (g *generator) generateXTest(dir string, srcs, imports []string) (*bzl.Rule
 
 	attrs := []keyvalue{
 		{key: "name", value: name},
-		{key: "srcs", value: srcs},
+		{key: "srcs", value: g.refSrc(srcs)},
 	}
 
 	deps, err := g.dependencies(imports, dir)
